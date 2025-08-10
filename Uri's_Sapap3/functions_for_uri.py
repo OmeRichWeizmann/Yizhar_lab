@@ -1,22 +1,20 @@
-### function for analyzing Uri's Sapap3 data
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import pyabf
 from scipy import signal
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
 import pandas as pd
-import matplotlib.cm as cm
+from scipy.signal import welch
+from functions_for_uri import *
+import seaborn as sns
 
 
-def peaks_finder(trace_filtred,thresh_min,thresh_max,thresh_prominence,fs,plot_it,protocol):    
+def peaks_finder(trace_filtred,thresh_min,thresh_max,thresh_prominence,fs,plot_it):    
     fs = 50000
-    if protocol == "iv_curve":
-        peaks_signal = trace_filtred[497*50:(497*50)+25000] 
-    
-    elif protocol == "ramp_protocol":
-        peaks_signal = trace_filtred[563*50:(563*50)+50000]# this is for the ramp protocol # This is for the IV curve protocol# 497 ms from recording start till stim on and 50 samples per ms] 
+    peaks_signal = trace_filtred
 
     # Event window parameters
     event_no = 0  # Event viewer: 0 is the first event
@@ -145,4 +143,55 @@ def peaks_finder(trace_filtred,thresh_min,thresh_max,thresh_prominence,fs,plot_i
     table.round(3)
     plt.show()
     return table # round: display of decimal numbers in the table
+
+
+
+
+
+def filtering_function(abf):    
+# Lowpass Bessel filter
+    time = np.arange(len(abf))  # in seconds
+    fs = 50000
+    signal_raw = abf
+    b_lowpass, a_lowpass = signal.bessel(4,     # Order of the filter
+                                        1000,  # Cutoff frequency
+                                        'low', # Type of filter
+                                        analog=False,  # Analog or digital filter
+                                        norm='phase',  # Critical frequency normalization
+                                        fs=fs)  # fs: sampling frequency
+    
+    # Notch Besse filter (comment out if not needed)
+    b_notch, a_notch = signal.bessel(1,     # Order of the filter
+                                    [49, 51],  # Cutoff frequency
+                                    'bandstop', # Type of filter
+                                    analog=False,  # Analog or digital filter
+                                    fs=fs)  # fs: sampling frequency
+    
+    # Combine both filters (comment out if not needed)
+    b_multiband = signal.convolve(b_lowpass, b_notch)
+    a_multiband = signal.convolve(a_lowpass, a_notch)
+    
+    # For 2 filters (comment out if not needed)
+    signal_filtered = signal.filtfilt(b_multiband, a_multiband, signal_raw)
+    
+    
+    # Calculate standard deviation of the full trace
+    std_trace = np.std(signal_filtered)
+    
+    # Calculate the 95th percentile for positive values and 10th percentile for negative values
+    #baseline_positive_mean = np.percentile(signal_filtered[signal_filtered > 0], 99)
+    #baseline_negative_mean = np.percentile(signal_filtered[signal_filtered < 0], 10)
+    
+    # Create a baseline signal where values outside the range are set to NaN
+    #baseline_signal = np.where((signal_filtered <= baseline_positive_mean) & (signal_filtered >= baseline_negative_mean), 
+    #                        signal_filtered, np.nan)
+    
+    # Calculate standard deviation of the baseline signal (ignoring NaN values)
+    #std_baseline = np.nanstd(baseline_signal)
+
+    return signal_filtered
+
+
+
+
 
